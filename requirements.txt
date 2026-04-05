@@ -1,5 +1,5 @@
 numpy
-os
 matplotlib
 scipy
-sklearn
+scikit-learn
+soundfile
