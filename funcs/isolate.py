@@ -31,7 +31,6 @@ def isolate_angle(audio, fs, target_angle_deg, tolerance_deg=25, nperseg=1024):
     lr_score = np.log((left_energy + eps) / (right_energy + eps))
 
     angle_est = np.arctan2(lr_score, fb_score)
-    angle_est = angle_est - np.deg2rad(90)
     angle_est = np.mod(angle_est, 2 * np.pi)
 
     target_angle = np.deg2rad(target_angle_deg)
@@ -83,7 +82,6 @@ def isolate_angle_and_denoise(audio, fs, target_angle_deg, tolerance_deg=25, npe
     lr_score = np.log((left_energy + eps) / (right_energy + eps))
 
     angle_est = np.arctan2(lr_score, fb_score)
-    angle_est = angle_est - np.deg2rad(90)
     angle_est = np.mod(angle_est, 2 * np.pi)
 
     target_angle = np.deg2rad(target_angle_deg)
