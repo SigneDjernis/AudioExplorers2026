@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.signal as signal
+from scipy.linalg import eigh
+from scipy.io import wavfile
 
 def isolate_angle(audio, fs, target_angle_deg, tolerance_deg=25, nperseg=1024):
     """
