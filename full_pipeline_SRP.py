@@ -13,7 +13,7 @@ fs, data = wavfile.read('Recordings/mixture.wav')  # (samples, 4) → [LF, LR, R
 data = data.astype(np.float32) / 32768.0
 
 # ── Microphone array geometry (metres) ───────────────────────────────────────
-d_lr = 0.085
+d_lr = 0.085 
 d_fb = 0.0075
 mic_array = np.array([
     [-d_lr, -d_lr,  d_lr,  d_lr],
