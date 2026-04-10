@@ -1,8 +1,9 @@
 import numpy as np
 import scipy.signal as signal
 from scipy.linalg import eigh
-
- 
+from scipy.signal import resample_poly
+import soundfile as sf
+from scipy.io import wavfile
 
 def estimate_directional_masks(Zxx, target_angle_deg, tolerance_deg=25, eps=1e-8):
     """
@@ -168,3 +169,24 @@ def enhance_source(audio, fs, target_angle_deg, tolerance_deg=25, nperseg=1024):
         y /= peak
 
     return y
+
+if __name__ == "__main__":
+    angles = [7,87,137,184,230,271] # Angles found from the SRP analysis
+    fs, data = wavfile.read('Recordings/mixture.wav')
+    data = data.astype(np.float32) / 32768.0
+
+    for angle in angles:
+        print(f"Isolating angle {angle}°...")
+        enhanced = enhance_source(
+            data,
+            fs,
+            target_angle_deg=angle,
+            tolerance_deg=25,
+            nperseg=1024
+        )
+
+        enhanced_16k = resample_poly(enhanced, up=16000, down=fs).astype(np.float32)
+        result = model.transcribe(enhanced_16k, fp16=False)
+        print(result["text"])
+
+        sf.write(f"speakers/speaker_{angle:.0f}deg.wav", enhanced, fs)
