@@ -221,7 +221,7 @@ def plot_results(band_spectra, vote_smooth, angles_deg,
 if __name__ == "__main__":
 
     # ── Load audio ────────────────────────────────────────────────────────
-    fs, data = wavfile.read('Recordings/mixture.wav')  # (samples, 4) → [LF, LR, RF, RR]
+    fs, data = wavfile.read('recordings/mixture.wav')  # (samples, 4) → [LF, LR, RF, RR]
     data = data.astype(np.float32) / 32768.0
 
     # ── Microphone array geometry (metres) ────────────────────────────────

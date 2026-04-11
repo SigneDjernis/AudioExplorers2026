@@ -189,4 +189,4 @@ if __name__ == "__main__":
         result = model.transcribe(enhanced_16k, fp16=False)
         print(result["text"])
 
-        sf.write(f"speakers/speaker_{angle:.0f}deg.wav", enhanced, fs)
+        sf.write(f"results/speakers/speaker_{angle:.0f}deg.wav", enhanced, fs)
