@@ -5,36 +5,6 @@ from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter1d
 from scipy.io import wavfile
 
-# ── Load audio ────────────────────────────────────────────────────────────────
-fs, data = wavfile.read('Recordings/mixture.wav')  # (samples, 4) → [LF, LR, RF, RR]
-data = data.astype(np.float32) / 32768.0
-
-# ── Microphone array geometry (metres) ───────────────────────────────────────
-d_lr = 0.085
-d_fb = 0.0075
-mic_array = np.array([
-    [-d_lr, -d_lr,  d_lr,  d_lr],
-    [ d_fb, -d_fb,  d_fb, -d_fb],
-])
-
-eps     = 1e-8
-C_SOUND = 343.0
-
-# ── Tuning ────────────────────────────────────────────────────────────────────
-NFFT         = 2048
-SMOOTH_SIGMA = 5
-MIN_DIST_DEG = 30
-BAND_CONSENSUS = 2
-
-# Bands shifted to cover speech energy more evenly.
-# Alias frequency for 85mm spacing = c/(2d) ≈ 2kHz, so we split more finely
-# below that and use one wider band above where we expect less reliable phase.
-FREQ_BANDS = [
-    [300,   800],   # fundamental frequencies + low formants
-    [800,  1800],   # core speech, most reliable phase
-    [1800, 3500],   # upper formants, still mostly below alias freq
-    [3500, 7000],   # higher frequencies, down-weighted by speech curve
-]
 
 def speech_weight(freqs):
     """
@@ -48,7 +18,7 @@ def speech_weight(freqs):
     return (lo * hi).astype(np.float32)
 
 
-def diagnose_array(audio, fs):
+def diagnose_array(audio, fs, eps):
     print("  Channel RMS levels:")
     labels = ["LF", "LR", "RF", "RR"]
     rms = [np.sqrt(np.mean(audio[:, c] ** 2)) for c in range(4)]
@@ -65,8 +35,7 @@ def diagnose_array(audio, fs):
           f"({'front' if ffe > bre else 'back'} dominant)")
 
 
-def srp_spectrum_for_band(audio, fs, mic_array, freq_band,
-                          nfft=NFFT, smooth_sigma=SMOOTH_SIGMA):
+def srp_spectrum_for_band(audio, fs, mic_array, freq_band, nfft, smooth_sigma, eps):
     """SRP-PHAT for one frequency band with speech-shaped weighting."""
     azimuths = np.linspace(0, 2 * np.pi, 360, endpoint=False)
 
@@ -89,10 +58,8 @@ def srp_spectrum_for_band(audio, fs, mic_array, freq_band,
     return spec_smooth, np.degrees(azimuths)
 
 
-def find_speaker_angles(audio, fs, mic_array,
-                        freq_bands=FREQ_BANDS,
-                        min_dist_deg=MIN_DIST_DEG,
-                        band_consensus=BAND_CONSENSUS,
+def find_speaker_angles(audio, fs, mic_array, freq_bands, min_dist_deg,
+                        band_consensus, nfft, smooth_sigma, eps,
                         abs_threshold=0.3):
     """
     Run SRP independently per band, vote across bands, return speaker angles.
@@ -105,7 +72,9 @@ def find_speaker_angles(audio, fs, mic_array,
     band_spectra = []
 
     for band in freq_bands:
-        spec, angles_deg = srp_spectrum_for_band(audio, fs, mic_array, band)
+        spec, angles_deg = srp_spectrum_for_band(
+            audio, fs, mic_array, band, nfft, smooth_sigma, eps
+        )
         # Circular padding so 0° peak is never split across the boundary
         spec_pad  = np.concatenate([spec[-pad:], spec, spec[:pad]])
         peaks_pad, _ = find_peaks(spec_pad, distance=min_dist,
@@ -162,11 +131,10 @@ def find_speaker_angles(audio, fs, mic_array,
     return speaker_angles, band_spectra, vote_smooth, angles_deg
 
 
-def run_srp_fullband(audio, fs, mic_array, n_speakers,
-                     nfft=NFFT, smooth_sigma=SMOOTH_SIGMA,
+def run_srp_fullband(audio, fs, mic_array, n_speakers, nfft, smooth_sigma, eps,
                      freq_range=[300, 7000]):
     """Full-band SRP with speech weighting — for visualisation only."""
-    azimuths = np.linspace(0, 2 * np.pi, 360, endpoint=False)
+    azimuths   = np.linspace(0, 2 * np.pi, 360, endpoint=False)
     angles_deg = np.degrees(azimuths)
 
     freqs = np.fft.rfftfreq(nfft, d=1.0 / fs)
@@ -191,7 +159,7 @@ def run_srp_fullband(audio, fs, mic_array, n_speakers,
 
 
 def plot_results(band_spectra, vote_smooth, angles_deg,
-                 speaker_angles, fullband_smooth):
+                 speaker_angles, fullband_smooth, band_consensus, eps):
     n_bands = len(band_spectra)
     fig, axes = plt.subplots(2, n_bands + 1,
                              figsize=(4 * (n_bands + 1), 7))
@@ -211,8 +179,8 @@ def plot_results(band_spectra, vote_smooth, angles_deg,
     ax = axes[0, n_bands]
     ax.plot(angles_deg, vote_smooth, color='darkorange', lw=2)
     ax.fill_between(angles_deg, vote_smooth, alpha=0.2, color='darkorange')
-    ax.axhline(BAND_CONSENSUS - 0.5, color='crimson', lw=1.5,
-               linestyle='--', label=f'Consensus={BAND_CONSENSUS}')
+    ax.axhline(band_consensus - 0.5, color='crimson', lw=1.5,
+               linestyle='--', label=f'Consensus={band_consensus}')
     for ang, votes, _ in speaker_angles:
         ax.axvline(ang, color='crimson', lw=1.5, alpha=0.7)
         ax.text(ang + 2, votes + 0.1, f"{ang:.0f}°",
@@ -245,20 +213,60 @@ def plot_results(band_spectra, vote_smooth, angles_deg,
     ax_full.legend()
     ax_full.grid(True, alpha=0.3)
 
-    plt.savefig("srp_crossband.png", dpi=150, bbox_inches='tight')
+    plt.savefig("results/srp_crossband.png", dpi=150, bbox_inches='tight')
     plt.show()
 
 
 
 if __name__ == "__main__":
 
-    print("=== Array diagnostics ===")
-    diagnose_array(data, fs)
+    # ── Load audio ────────────────────────────────────────────────────────
+    fs, data = wavfile.read('Recordings/mixture.wav')  # (samples, 4) → [LF, LR, RF, RR]
+    data = data.astype(np.float32) / 32768.0
 
-    # ── Step 1: cross-band SRP vote map ───────────────────────────────────
+    # ── Microphone array geometry (metres) ────────────────────────────────
+    d_lr = 0.085   # lateral spacing  → alias freq ≈ c/(2d) ≈ 2 kHz
+    d_fb = 0.0075  # front-back offset → breaks left/right symmetry
+    mic_array = np.array([
+        [-d_lr, -d_lr,  d_lr,  d_lr],
+        [ d_fb, -d_fb,  d_fb, -d_fb],
+    ])
+
+    # ── Constants ─────────────────────────────────────────────────────────
+    eps     = 1e-8   # numerical stability floor
+    C_SOUND = 343.0  # speed of sound (m/s)
+
+    # ── Tuning hyperparameters ────────────────────────────────────────────
+    NFFT           = 2048  # FFT size - 7.8 Hz/bin at 16 kHz
+    SMOOTH_SIGMA   = 5     # Gaussian smoothing width (degrees)
+    MIN_DIST_DEG   = 30    # minimum angular separation between speakers
+    BAND_CONSENSUS = 2     # how many bands must agree to confirm a speaker
+
+    # Bands shifted to cover speech energy more evenly.
+    # Alias frequency for 85 mm spacing = c/(2d) = ca. 2 kHz, so we split more
+    # finely below that and use one wider band above where phase is less reliable.
+    FREQ_BANDS = [
+        [300,   800],   # fundamental frequencies + low formants
+        [800,  1800],   # core speech, most reliable phase
+        [1800, 3500],   # upper formants, still mostly below alias freq
+        [3500, 7000],   # higher frequencies, down-weighted by speech curve
+    ]
+
+    # ── Array diagnostics ─────────────────────────────────────────────────
+    print("=== Array diagnostics ===")
+    diagnose_array(data, fs, eps)
+
+    # ── Cross-band SRP vote map ───────────────────────────────────────────
     print("\n=== Cross-band SRP speaker localisation ===")
-    speaker_angles, band_spectra, vote_smooth, angles_deg = \
-        find_speaker_angles(data, fs, mic_array)
+    speaker_angles, band_spectra, vote_smooth, angles_deg = find_speaker_angles(
+        data, fs, mic_array,
+        freq_bands=FREQ_BANDS,
+        min_dist_deg=MIN_DIST_DEG,
+        band_consensus=BAND_CONSENSUS,
+        nfft=NFFT,
+        smooth_sigma=SMOOTH_SIGMA,
+        eps=eps,
+    )
 
     print(f"\nDetected {len(speaker_angles)} speaker(s):")
     for ang, votes, pwr in speaker_angles:
@@ -267,9 +275,15 @@ if __name__ == "__main__":
 
     # ── Full-band SRP (visual reference only) ─────────────────────────────
     print("\n=== Full-band SRP (visual reference) ===")
-    _, fullband_smooth = run_srp_fullband(data, fs, mic_array, len(speaker_angles))
+    _, fullband_smooth = run_srp_fullband(
+        data, fs, mic_array, len(speaker_angles),
+        nfft=NFFT, smooth_sigma=SMOOTH_SIGMA, eps=eps,
+    )
 
-    plot_results(band_spectra, vote_smooth, angles_deg, speaker_angles, fullband_smooth)
-
+    plot_results(
+        band_spectra, vote_smooth, angles_deg,
+        speaker_angles, fullband_smooth,
+        band_consensus=BAND_CONSENSUS, eps=eps,
+    )
 
     print("\nDone.")

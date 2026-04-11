@@ -172,7 +172,7 @@ def enhance_source(audio, fs, target_angle_deg, tolerance_deg=25, nperseg=1024):
 
 if __name__ == "__main__":
     angles = [7,87,137,184,230,271] # Angles found from the SRP analysis
-    fs, data = wavfile.read('Recordings/mixture.wav')
+    fs, data = wavfile.read('recordings/mixture.wav')
     data = data.astype(np.float32) / 32768.0
 
     for angle in angles:
