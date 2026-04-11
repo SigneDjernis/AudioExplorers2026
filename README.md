@@ -7,13 +7,13 @@ In this repository, we explore a set of complementary methods compiled into a pr
 ## Features
 - **Steered Response Power (SRP) algorithm:** To detect the direction of arrival (DoA) of each speaker, we have implemented SRP ('steered_response_power.py'), which returns the angles of interest.
 - **Beamforming algorithm:** Given the estimated angles of interest, beamforming techniques are applied to separate individual speakers based on their spatial locations ('beamforming.py')
-- **Characteristics algorithm:** Using the separated audio signals, this module ('characteristics.py') transcribes the speech and classifies speaker characteristics such as gender.
+- **Characteristics algorithm:** Using the separated audio signals, this module ('transcription.ipynb') transcribes the speech.
 
 
 ## Structure
 The repository is organized as follows:
-- recordings: Contains the 'example_mixture.wav' and 'wav'
-- funcs: contains the scripts from each of the three analysis sections.
+- recordings: Contains the 'example_mixture.wav' and 'mixture.wav'
+- funcs: contains the files from each of the three analysis sections.
 - results: contains images from the different and the transcriptions, as well as a folder (speakers) that contains the separated audio signals for all the angles of interest.
 - Outer folder: Contains the folders with the code to solve the challenge. 
 
