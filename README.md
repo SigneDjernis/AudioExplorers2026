@@ -14,9 +14,8 @@ In this repository, we explore a set of complementary methods compiled into a pr
 The repository is organized as follows:
 - recordings: Contains the 'example_mixture.wav' and 'wav'
 - funcs: contains the scripts from each of the three analysis sections.
-- speakers: Contains the separated audio signals for all the angles of interest
-- results: contains images from the different and the transcriptions.
-- Outer folder: Contains code for solving the Software Challenge.
+- results: contains images from the different and the transcriptions, as well as a folder (speakers) that contains the separated audio signals for all the angles of interest.
+- Outer folder: Contains the folders and a main script running the pipeline. 
 
 
 ## Requirements
