@@ -15,7 +15,7 @@ The repository is organized as follows:
 - recordings: Contains the 'example_mixture.wav' and 'wav'
 - funcs: contains the scripts from each of the three analysis sections.
 - results: contains images from the different and the transcriptions, as well as a folder (speakers) that contains the separated audio signals for all the angles of interest.
-- Outer folder: Contains the folders and a main script running the pipeline. 
+- Outer folder: Contains the folders with the code to solve the challenge. 
 
 
 ## Requirements
